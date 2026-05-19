@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Parasoft.Dottest.Examples.Bank.Tests.MSTest/Parasoft.Dottest.Examples.Bank.Tests.MSTest.csproj" />
+  <Project Path="Parasoft.Dottest.Examples.Bank.Tests.NUnit/Parasoft.Dottest.Examples.Bank.Tests.NUnit.csproj" />
+  <Project Path="Parasoft.Dottest.Examples.Bank.Tests.xUnit/Parasoft.Dottest.Examples.Bank.Tests.xUnit.csproj" />
+  <Project Path="Parasoft.Dottest.Examples.Bank/Parasoft.Dottest.Examples.Bank.csproj" />
+</Solution>
