@@ -1,114 +1,94 @@
 name: dotTEST Autofix Workflow
 
 on:
-  # Triggers the workflow on pull request events but only for the master (main) branch.
   pull_request:
     branches: [ master, main ]
-
-  # Allows you to run this workflow manually from the Actions tab.
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel.
 jobs:
   run-dottest-flow:
     name: Analyze project with dotTEST
 
-    # Specifies required permissions for upload-sarif action
     permissions:
-      # required for all workflows
       security-events: write
-      # only required for workflows in private repositories
       actions: read
       contents: write
       pull-requests: write
 
-    # Specifies the type of runner that the job will run on.
     runs-on: self-hosted
 
-    # Steps represent a sequence of tasks that will be executed as part of the job.
     steps:
-       
-      # Checks out your repository under $GITHUB_WORKSPACE, so that your job can access it.
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Checkout the actual PR head, not the merge commit
           ref: ${{ github.event.pull_request.head.sha }}
 
-      # Clone dottest AI agent skills
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Clone dottest AI agent skills
         run: git clone https://github.com/parasoft/dottest-ai-agent-skills.git ${{ github.workspace }}/.github/skills
 
-      # Setup fix branch from PR head BEFORE running the agent
       - name: Setup fix branch
         shell: pwsh
         run: |
           $PR_HEAD_SHA = "${{ github.event.pull_request.head.sha }}"
           $PR_BRANCH   = "${{ github.event.pull_request.head.ref }}"
           if ([string]::IsNullOrWhiteSpace($PR_BRANCH)) {
-            $FIXES_BRANCH  = "dottest-ai-agent/[timestamp]"
+            $FIXES_BRANCH = "dottest-ai-agent/[timestamp]"
           }
           else {
-            $FIXES_BRANCH  = "dottest-ai-agent/$PR_BRANCH/[timestamp]"
+            $FIXES_BRANCH = "dottest-ai-agent/$PR_BRANCH/[timestamp]"
           }
-          $FIXES_BRANCH  = $FIXES_BRANCH -replace '\[timestamp\]', (Get-Date -Format 'yyyyMMddHHmmss')
+          $FIXES_BRANCH = $FIXES_BRANCH -replace '\[timestamp\]', (Get-Date -Format 'yyyyMMddHHmmss')
 
-          # Defensive: Delete branch if it already exists (from previous runs)
-          # This handles re-runs and prevents "fatal: a branch named ... already exists"
           echo "Delete branch $FIXES_BRANCH"
           if (git branch --list "$FIXES_BRANCH") { git branch -D "$FIXES_BRANCH" }
 
           echo "Checkout branch $FIXES_BRANCH from $PR_HEAD_SHA"
-          # Start fix branch from the real PR head (not detached merge commit)
           git checkout -b "$FIXES_BRANCH" "$PR_HEAD_SHA"
 
-          # Export for subsequent steps
           echo "FIXES_BRANCH_NAME=$FIXES_BRANCH" >> $env:GITHUB_ENV
 
-      # Build your project (This step is optional)
       - name: Build project (optional)
         run: dotnet build
 
-      # Run dotTEST Autofix flow
       - name: Run dotTEST AI Agent Autofix
         id: run-dottest-ai-agent-autofix
         env:
           WORKFLOWS_DIR: ${{ github.workspace }}/.github/workflows
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         shell: pwsh
         run: |
-          # Capture SHA before running the agent so we can detect new commits
           $ORIGINAL_SHA = git rev-parse HEAD
 
-          # Run dotTEST AI agent
           & "$env:WORKFLOWS_DIR/dottest-ai-agent-run.ps1"
-          
-          # Only push and comment if there are new commits
+
           $CURRENT_SHA = git rev-parse HEAD
           if ($CURRENT_SHA -ne $ORIGINAL_SHA) {
             $ORIGINAL_BRANCH = "${{ github.event.pull_request.head.ref }}"
 
-            # Push changes to the fix branch
             git push origin "$env:FIXES_BRANCH_NAME"
 
-            # Create pull request for the fix branch
             $BRANCH_URL = "${{ github.server_url }}/${{ github.repository }}/tree/$env:FIXES_BRANCH_NAME"
             $cmd_pr_create = "gh pr create --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --title `"dottest-ai-agent: $env:FIXES_BRANCH_NAME`" --body `"Automated dotTEST AI Agent changes`""
             Write-Output $cmd_pr_create
-            
             Invoke-Expression $cmd_pr_create
-            #gh pr create --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
+
             $PR_URL = "${{ github.server_url }}/${{ github.repository }}/pull"
             Start-Sleep -Seconds 2
 
-            $cmd_pr_number = "gh pr list --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --state open --limit 1 | Select-Object -First 1 | ForEach-Object { ($_ -split '\s+')[0] }"
+            $cmd_pr_number = "gh pr list --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --state open --limit 1 | Select-Object -First 1 | ForEach-Object { (`$_ -split '\s+')[0] }"
             Write-Output $cmd_pr_number
             $PR_NUMBER = Invoke-Expression $cmd_pr_number
 
-            #$PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --state open --limit 1 | Select-Object -First 1) -split '\s+' | Select-Object -First 1
-
             $cmd_pr_comment = "gh pr comment ${{ github.event.pull_request.number }} --body `"dotTEST AI Agent branch: $BRANCH_URL | Pull request: $PR_URL/$PR_NUMBER`""
             Write-Output $cmd_pr_comment
-            Invoke-Expression $cmd_pr_comment 
+            Invoke-Expression $cmd_pr_comment
           }
