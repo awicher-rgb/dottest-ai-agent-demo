@@ -46,6 +46,7 @@ jobs:
         run: |
           $PR_HEAD_SHA = "${{ github.event.pull_request.head.sha }}"
           $PR_BRANCH   = "${{ github.event.pull_request.head.ref }}"
+          if ([string]::IsNullOrWhiteSpace($PR_BRANCH)) { $PR_BRANCH = $PR_HEAD_SHA }
           $FIXES_BRANCH  = "dottest-ai-agent/$PR_BRANCH/[timestamp]" -replace '\[timestamp\]', (Get-Date -Format 'yyyyMMddHHmmss')
 
           # Defensive: Delete branch if it already exists (from previous runs)
