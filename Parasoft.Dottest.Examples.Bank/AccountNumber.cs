@@ -53,8 +53,12 @@ namespace Parasoft.Dottest.Examples.Bank
 
         public override bool Equals(object obj)
         {
+            if (obj == null)
+            {
+                return false;
+            }
             AccountNumber number = (AccountNumber) obj;
-            if (number != null & number._digits.Length != _digits.Length)
+            if (number._digits.Length != _digits.Length)
             {
                 return false;
             }
