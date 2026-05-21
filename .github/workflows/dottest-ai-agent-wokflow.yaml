@@ -75,6 +75,7 @@ jobs:
         id: run-dottest-ai-agent-autofix
         env:
           WORKFLOWS_DIR: ${{ github.workspace }}/.github/workflows
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           # Capture SHA before running the agent so we can detect new commits
