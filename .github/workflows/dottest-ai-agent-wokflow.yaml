@@ -70,6 +70,29 @@ jobs:
       - name: Build project (optional)
         run: dotnet build
 
+      # Register the dotTEST MCP server with Copilot CLI on the runner.
+      # This is idempotent and ensures the config exists even after runner maintenance.
+      # NOTE: The GitHub organization's Copilot policy must also allow MCP servers.
+      # To enable it: Org Settings → Copilot → Policies → MCP servers → Allow (or add 'dottestmcp').
+      - name: Register dotTEST MCP server
+        shell: pwsh
+        run: |
+          $mcpConfigDir  = Join-Path $env:USERPROFILE ".copilot"
+          $mcpConfigFile = Join-Path $mcpConfigDir "mcp-config.json"
+          if (-not (Test-Path $mcpConfigDir)) { New-Item -ItemType Directory -Path $mcpConfigDir | Out-Null }
+          $mcpConfig = [ordered]@{
+            mcpServers = [ordered]@{
+              dottestmcp = [ordered]@{
+                type    = "local"
+                command = "C:\Program Files\Parasoft\dotTEST\2026.1\integration\mcp\dottestmcp.bat"
+                args    = @()
+                tools   = @("*")
+              }
+            }
+          }
+          $mcpConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $mcpConfigFile -Encoding utf8
+          Write-Output "MCP config written to $mcpConfigFile"
+
       # Run dotTEST Autofix flow
       - name: Run dotTEST AI Agent Autofix
         id: run-dottest-ai-agent-autofix
