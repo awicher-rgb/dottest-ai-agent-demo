@@ -71,27 +71,19 @@ jobs:
         run: dotnet build
 
       # Register the dotTEST MCP server with Copilot CLI on the runner.
-      # This is idempotent and ensures the config exists even after runner maintenance.
-      # NOTE: The GitHub organization's Copilot policy must also allow MCP servers.
-      # To enable it: Org Settings → Copilot → Policies → MCP servers → Allow (or add 'dottestmcp').
+      # Using 'copilot mcp add' (not raw JSON write) so the CLI records the server
+      # together with its policy approval — required to avoid "blocked by policy".
+      # NOTE: If the GitHub org has an Extensions/MCP allowlist policy, 'dottestmcp'
+      # must also be permitted there: Org Settings → Copilot → Policies → Extensions → Allow.
       - name: Register dotTEST MCP server
         shell: pwsh
         run: |
-          $mcpConfigDir  = Join-Path $env:USERPROFILE ".copilot"
-          $mcpConfigFile = Join-Path $mcpConfigDir "mcp-config.json"
-          if (-not (Test-Path $mcpConfigDir)) { New-Item -ItemType Directory -Path $mcpConfigDir | Out-Null }
-          $mcpConfig = [ordered]@{
-            mcpServers = [ordered]@{
-              dottestmcp = [ordered]@{
-                type    = "local"
-                command = "C:\Program Files\Parasoft\dotTEST\2026.1\integration\mcp\dottestmcp.bat"
-                args    = @()
-                tools   = @("*")
-              }
-            }
-          }
-          $mcpConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $mcpConfigFile -Encoding utf8
-          Write-Output "MCP config written to $mcpConfigFile"
+          $mcpBat = "C:\Program Files\Parasoft\dotTEST\2026.1\integration\mcp\dottestmcp.bat"
+          # Remove stale registration (ignore errors if not present)
+          copilot mcp delete dottestmcp 2>$null
+          # Re-register; 'copilot mcp add <name> <command>' is non-interactive
+          copilot mcp add dottestmcp $mcpBat
+          Write-Output "dottestmcp registered via copilot mcp add"
 
       # Run dotTEST Autofix flow
       - name: Run dotTEST AI Agent Autofix
