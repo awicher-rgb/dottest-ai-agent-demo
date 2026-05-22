@@ -75,6 +75,7 @@ jobs:
         id: run-dottest-ai-agent-autofix
         env:
           WORKFLOWS_DIR: ${{ github.workspace }}/.github/workflows
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           # Capture SHA before running the agent so we can detect new commits
@@ -93,21 +94,21 @@ jobs:
 
             # Create pull request for the fix branch
             $BRANCH_URL = "${{ github.server_url }}/${{ github.repository }}/tree/$env:FIXES_BRANCH_NAME"
-            $cmd_pr_create = "gh pr create --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --title `"dottest-ai-agent: $env:FIXES_BRANCH_NAME`" --body `"Automated dotTEST AI Agent changes`""
-            Write-Output $cmd_pr_create
-            
-            Invoke-Expression $cmd_pr_create
-            #gh pr create --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
+            if ([string]::IsNullOrWhiteSpace($ORIGINAL_BRANCH)) {
+              gh pr create --head "$env:FIXES_BRANCH_NAME" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
+            } else {
+              gh pr create --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
+            }
             $PR_URL = "${{ github.server_url }}/${{ github.repository }}/pull"
             Start-Sleep -Seconds 2
 
-            $cmd_pr_number = "gh pr list --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --state open --limit 1 | Select-Object -First 1 | ForEach-Object { ($_ -split '\s+')[0] }"
-            Write-Output $cmd_pr_number
-            $PR_NUMBER = Invoke-Expression $cmd_pr_number
+            if ([string]::IsNullOrWhiteSpace($ORIGINAL_BRANCH)) {
+              $PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --state open --limit 1 --json number --jq '.[0].number')
+            } else {
+              $PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --state open --limit 1 --json number --jq '.[0].number')
+            }
 
-            #$PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --state open --limit 1 | Select-Object -First 1) -split '\s+' | Select-Object -First 1
-
-            $cmd_pr_comment = "gh pr comment ${{ github.event.pull_request.number }} --body `"dotTEST AI Agent branch: $BRANCH_URL | Pull request: $PR_URL/$PR_NUMBER`""
-            Write-Output $cmd_pr_comment
-            Invoke-Expression $cmd_pr_comment 
+            if ('${{ github.event.pull_request.number }}' -ne '') {
+              gh pr comment ${{ github.event.pull_request.number }} --body "dotTEST AI Agent branch: $BRANCH_URL | Pull request: $PR_URL/$PR_NUMBER"
+            }
           }
