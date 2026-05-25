@@ -90,7 +90,7 @@ jobs:
           $CURRENT_SHA = git rev-parse HEAD
           if ($CURRENT_SHA -ne $ORIGINAL_SHA) {
             $ORIGINAL_BRANCH = "${{ github.event.pull_request.head.ref }}"
-
+            if (-not $ORIGINAL_BRANCH) { $ORIGINAL_BRANCH = "${{ github.ref_name }}" }
             # Push changes to the fix branch
             git push origin "$env:FIXES_BRANCH_NAME"
 
