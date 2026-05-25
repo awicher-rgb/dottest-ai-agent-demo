@@ -70,23 +70,11 @@ jobs:
       - name: Build project (optional)
         run: dotnet build
 
-      # Register the dotTEST MCP server with Copilot CLI on the runner.
-      # 'copilot mcp add <name> <command>' is a non-interactive CLI subcommand that
-      # records the server with its policy approval — required to avoid "blocked by policy".
-      - name: Register dotTEST MCP server
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $mcpBat = "C:\Program Files\Parasoft\dotTEST\2026.1\integration\mcp\dottestmcp.bat"
-          copilot mcp add dottestmcp $mcpBat
-          Write-Output "dottestmcp registration exit code: $LASTEXITCODE"
-
       # Run dotTEST Autofix flow
       - name: Run dotTEST AI Agent Autofix
         id: run-dottest-ai-agent-autofix
         env:
           WORKFLOWS_DIR: ${{ github.workspace }}/.github/workflows
-          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           # Capture SHA before running the agent so we can detect new commits
@@ -105,21 +93,21 @@ jobs:
 
             # Create pull request for the fix branch
             $BRANCH_URL = "${{ github.server_url }}/${{ github.repository }}/tree/$env:FIXES_BRANCH_NAME"
-            if ([string]::IsNullOrWhiteSpace($ORIGINAL_BRANCH)) {
-              gh pr create --head "$env:FIXES_BRANCH_NAME" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
-            } else {
-              gh pr create --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
-            }
+            $cmd_pr_create = "gh pr create --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --title `"dottest-ai-agent: $env:FIXES_BRANCH_NAME`" --body `"Automated dotTEST AI Agent changes`""
+            Write-Output $cmd_pr_create
+            
+            Invoke-Expression $cmd_pr_create
+            #gh pr create --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --title "dottest-ai-agent: $env:FIXES_BRANCH_NAME" --body "Automated dotTEST AI Agent changes"
             $PR_URL = "${{ github.server_url }}/${{ github.repository }}/pull"
             Start-Sleep -Seconds 2
 
-            if ([string]::IsNullOrWhiteSpace($ORIGINAL_BRANCH)) {
-              $PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --state open --limit 1 --json number --jq '.[0].number')
-            } else {
-              $PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --state open --limit 1 --json number --jq '.[0].number')
-            }
+            $cmd_pr_number = "gh pr list --head `"$env:FIXES_BRANCH_NAME`" --base `"$ORIGINAL_BRANCH`" --state open --limit 1 | Select-Object -First 1 | ForEach-Object { ($_ -split '\s+')[0] }"
+            Write-Output $cmd_pr_number
+            $PR_NUMBER = Invoke-Expression $cmd_pr_number
 
-            if ('${{ github.event.pull_request.number }}' -ne '') {
-              gh pr comment ${{ github.event.pull_request.number }} --body "dotTEST AI Agent branch: $BRANCH_URL | Pull request: $PR_URL/$PR_NUMBER"
-            }
+            #$PR_NUMBER = (gh pr list --head "$env:FIXES_BRANCH_NAME" --base "$ORIGINAL_BRANCH" --state open --limit 1 | Select-Object -First 1) -split '\s+' | Select-Object -First 1
+
+            $cmd_pr_comment = "gh pr comment ${{ github.event.pull_request.number }} --body `"dotTEST AI Agent branch: $BRANCH_URL | Pull request: $PR_URL/$PR_NUMBER`""
+            Write-Output $cmd_pr_comment
+            Invoke-Expression $cmd_pr_comment 
           }
