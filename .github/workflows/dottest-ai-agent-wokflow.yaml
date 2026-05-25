@@ -45,7 +45,10 @@ jobs:
         shell: pwsh
         run: |
           $PR_HEAD_SHA = "${{ github.event.pull_request.head.sha }}"
-          $PR_BRANCH   = "${{ github.event.pull_request.head.ref }}"
+          if (-not $PR_HEAD_SHA) { $PR_HEAD_SHA = "${{ github.sha }}" }
+
+          $PR_BRANCH = "${{ github.event.pull_request.head.ref }}"
+          if (-not $PR_BRANCH) { $PR_BRANCH = "${{ github.ref_name }}" }
           if ([string]::IsNullOrWhiteSpace($PR_BRANCH)) {
             $FIXES_BRANCH  = "dottest-ai-agent/[timestamp]" 
           }
