@@ -68,10 +68,6 @@ namespace Parasoft.Dottest.Examples.Bank
                 {
                     count++;
                 }
-                else
-                {
-
-                }
                 return count;
             }
             return count;
